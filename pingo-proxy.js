@@ -110,17 +110,55 @@ class PinGo {
         
     }
 
+    getTodayUTCTimestamp() {
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        const todayUTCTimestamp = today.getTime();
+        return todayUTCTimestamp/1000;
+    }
+
     async dailyCheckin(token, proxy) {
+        const todayUTCTimestamp = this.getTodayUTCTimestamp();
+        const dayCheck = await this.getDayCheck(token, proxy);
+        if(Array.isArray(dayCheck) && dayCheck.length > 0) {
+            const checkToday = dayCheck.find(item => item.data === todayUTCTimestamp);
+            if(checkToday) {
+                if(checkToday.signined) {
+                    this.log(`Hôm nay bạn đã checkin rồi, phần thưởng: ${checkToday.punny} PUNNY`);
+                } else {
+                    await this.checkIn(token, proxy);
+                }
+            }
+        }
+    }
+    
+    async getDayCheck(token, proxy) {
         const headers = {
             ...this.headers,
             "Authorization": token
         }
+
         try {
             const response = await axios.get("https://pingo.work/api/punny/quests/dayCheck", { headers, httpsAgent: new HttpsProxyAgent(proxy) });
             if(response && response.data.code === 200) {
+                return response.data.data;
+            }
+            return null;
+        } catch(error) {
+            return null;
+        }
+    }
+
+    async checkIn(token, proxy) {
+        const headers = {
+            ...this.headers,
+            "Authorization": token
+        }
+        const payload = {questsId: 5, checkIn: true}
+        try {
+            const response = await axios.post("https://pingo.work/api/punny/quests/verify", payload, {headers, httpsAgent: new HttpsProxyAgent(proxy) });
+            if(response && response.data.code === 200 && response.data.data.verify) {
                 this.log(`Daily checkin thành công...`, 'success');
-            } else {
-                this.log(`Hôm nay bạn đã checkin rồi`, 'warning');
             }
         } catch(error) {
             this.log(`Daily checkin gặp lỗi: ${error.message}`, 'error');
@@ -158,6 +196,7 @@ class PinGo {
         }
     }
     
+
     async verifyTask(token, proxy, task) {
         const headers = {
             ...this.headers,
